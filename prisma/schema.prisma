@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+  // DŮLEŽITÉ: Zapneme podporu pro drivery
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model GolemLog {
+  id        String   @id @default(cuid())
+  mood      String
+  createdAt DateTime @default(now())
+}
