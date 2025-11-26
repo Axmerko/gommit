@@ -1,17 +1,35 @@
-import NextAuth from "next-auth"
+import NextAuth, { AuthOptions } from "next-auth"
 import GithubProvider from "next-auth/providers/github"
 
-// Konfigurace přihlašování
-const handler = NextAuth({
+
+export const authOptions: AuthOptions = {
     providers: [
         GithubProvider({
             clientId: process.env.GITHUB_ID as string,
             clientSecret: process.env.GITHUB_SECRET as string,
+
+            authorization: { params: { scope: "read:user user:email repo" } },
         }),
     ],
-    // Tajný klíč pro šifrování session
     secret: process.env.NEXTAUTH_SECRET,
-})
 
-// Exportujeme metody GET a POST, aby Next.js věděl, jak reagovat
+
+    callbacks: {
+
+        async jwt({ token, account }) {
+            if (account) {
+                token.accessToken = account.access_token;
+            }
+            return token;
+        },
+
+        async session({ session, token }: any) {
+            session.accessToken = token.accessToken;
+            return session;
+        },
+    },
+}
+
+const handler = NextAuth(authOptions)
+
 export { handler as GET, handler as POST }
