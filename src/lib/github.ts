@@ -1,29 +1,20 @@
-export async function checkGithubActivity(accessToken: string): Promise<boolean> {
+// Vrací Datum posledního Pushe, nebo null (pokud žádný nenašel)
+export async function checkGithubActivity(accessToken: string): Promise<Date | null> {
     try {
-        // 1. Nastavíme dnešní datum
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
         console.log("🔍 KONTROLA GITHUB AKTIVITY...");
 
-        // 2. KROK A: Zjistíme tvé GitHub jméno (Login)
-        // Tím se vyhneme chybám 404, protože budeme adresovat přesně tebe.
+        // 1. Zjistíme uživatele
         const userRes = await fetch('https://api.github.com/user', {
             headers: { Authorization: `Bearer ${accessToken}` }
         });
 
-        if (!userRes.ok) {
-            console.error("❌ Chyba při získávání profilu:", userRes.status);
-            return false;
-        }
+        if (!userRes.ok) return null;
 
         const userData = await userRes.json();
         const username = userData.login;
-        console.log(`👤 Uživatel identifikován jako: ${username}`);
 
-        // 3. KROK B: Stáhneme eventy pro konkrétního uživatele
+        // 2. Stáhneme eventy
         const eventsUrl = `https://api.github.com/users/${username}/events`;
-
         const res = await fetch(eventsUrl, {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
@@ -32,35 +23,25 @@ export async function checkGithubActivity(accessToken: string): Promise<boolean>
             cache: 'no-store',
         });
 
-        if (!res.ok) {
-            console.error("❌ Chyba při stahování eventů:", res.status);
-            return false;
-        }
+        if (!res.ok) return null;
 
         const events = await res.json();
 
-        // DEBUG: Vypíšeme, co jsme našli (první 3 akce)
-        console.log("📋 Poslední akce na GitHubu:");
-        events.slice(0, 3).forEach((e: any) => {
-            console.log(` - ${e.type} v repu ${e.repo.name} (${new Date(e.created_at).toLocaleString()})`);
-        });
+        // 3. Hledáme NEJNOVĚJŠÍ PushEvent
+        // (API vrací eventy seřazené od nejnovějších, takže stačí najít první)
+        const lastPush = events.find((event: any) => event.type === 'PushEvent');
 
-        // 4. Vyhodnocení: Hledáme PushEvent z dneška
-        const hasPushToday = events.some((event: any) => {
-            const isPush = event.type === 'PushEvent';
-            const eventDate = new Date(event.created_at);
-            const isToday = eventDate >= today;
+        if (lastPush) {
+            const lastPushDate = new Date(lastPush.created_at);
+            console.log(`✅ Poslední commit: ${lastPushDate.toLocaleString()}`);
+            return lastPushDate;
+        }
 
-            if (isPush && isToday) {
-                console.log(`✅ NALEZENO! Push z: ${eventDate.toLocaleTimeString()}`);
-            }
-            return isPush && isToday;
-        });
-
-        return hasPushToday;
+        console.log("❌ Žádný PushEvent v historii nenalezen.");
+        return null;
 
     } catch (error) {
-        console.error("❌ Kritická chyba v github.ts:", error);
-        return false;
+        console.error("❌ Chyba v github.ts:", error);
+        return null;
     }
 }
